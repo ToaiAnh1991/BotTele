@@ -1,2 +1,4 @@
 python-telegram-bot==22.1
-httpx[socks]
+gspread
+oauth2client
+pandas
