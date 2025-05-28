@@ -70,7 +70,7 @@ KEY_MAP = load_key_map_from_sheet()
 
 # === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Gửi mã key "UExxxxx" để nhận file.")
+    await update.message.reply_text("♥️ please send KEY UExxxxxx to receive file.")
 
 # === Xử lý key người dùng ===
 async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,21 +83,32 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for file_info in files_info:
             try:
-                await context.bot.copy_message(
+                # 📤 Copy message từ kênh sang người dùng
+                sent_message = await context.bot.copy_message(
                     chat_id=chat_id,
                     from_chat_id=CHANNEL_ID,
                     message_id=int(file_info["message_id"]),
                     protect_content=True
                 )
-                await update.message.reply_text(f"✅ Đã gửi \"{file_info['name_file']}\"")
+
+                # 🧪 Kiểm tra nếu message chứa tài liệu (file)
+                if sent_message.document:
+                    file_id = sent_message.document.file_id
+                    file = await context.bot.get_file(file_id)
+
+                    if file.file_size < 100_000:  # dưới 100KB
+                        await update.message.reply_text("please contact admin ( https://t.me/A911Studio ) to receive new file update")
+
+                await update.message.reply_text(f"♥️ Your File \"{file_info['name_file']}\"")
+
             except Exception as e:
-                logger.error(f"[ERROR] Gửi file '{file_info['name_file']}': {e}")
+                logger.error(f"[ERROR] Your File '{file_info['name_file']}': {e}")
                 errors += 1
 
         if errors:
-            await update.message.reply_text("⚠️ Một số file lỗi khi gửi.")
+            await update.message.reply_text("⚠️ some files were corrupted when sent. please contact admin ( https://t.me/A911Studio ) to receive new file update")
     else:
-        await update.message.reply_text("❌ Key không đúng. Vui lòng kiểm tra lại.")
+        await update.message.reply_text("❌ KEY is incorrect. Please check again.")
 
 # === MAIN ===
 def main():
