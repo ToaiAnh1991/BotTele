@@ -14,7 +14,7 @@ from telegram.ext import (
 
 # === ⚙️ CẤU HÌNH BOT ===
 BOT_TOKEN = os.environ.get("BOT_TOKEN")  # 🔐 Token từ biến môi trường
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002635653671"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-100..."))
 
 # === 🔍 LOGGING ===
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -29,7 +29,6 @@ def load_key_map_from_sheet():
         if not json_key:
             raise Exception("⚠️ Thiếu biến môi trường GOOGLE_SHEET_JSON")
 
-        # Ghi file tạm nếu JSON là chuỗi
         with open("temp_key.json", "w", encoding="utf-8") as f:
             f.write(json_key)
 
@@ -37,18 +36,32 @@ def load_key_map_from_sheet():
         gc = gspread.authorize(credentials)
 
         SHEET_NAME = os.environ.get("SHEET_NAME", "KeyData")
-        sheet = gc.open(SHEET_NAME).sheet1
-        data = sheet.get_all_records()
+        sheet_file = gc.open(SHEET_NAME)
 
-        df = pd.DataFrame(data)
-        df["key"] = df["key"].astype(str).str.strip().str.lower()
+        # 🟡 Đọc danh sách các tab cần load từ biến môi trường
+        tabs = os.environ.get("SHEET_TABS", "1").split(",")
+        tabs = [tab.strip() for tab in tabs]
 
+        combined_df = pd.DataFrame()
+
+        for tab_name in tabs:
+            try:
+                worksheet = sheet_file.worksheet(tab_name)
+                data = worksheet.get_all_records()
+                df = pd.DataFrame(data)
+                df["key"] = df["key"].astype(str).str.strip().str.lower()
+                combined_df = pd.concat([combined_df, df], ignore_index=True)
+            except Exception as tab_error:
+                logger.warning(f"⚠️ Không thể đọc tab: {tab_name} – {tab_error}")
+
+        # 🔑 Nhóm dữ liệu theo key
         key_map = {
             key: group[["name_file", "message_id"]].to_dict("records")
-            for key, group in df.groupby("key")
+            for key, group in combined_df.groupby("key")
         }
 
         return key_map
+
     except Exception as e:
         logger.error(f"Lỗi tải sheet: {e}")
         return {}
@@ -57,7 +70,7 @@ KEY_MAP = load_key_map_from_sheet()
 
 # === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Gửi mã key sản phẩm để nhận file.")
+    await update.message.reply_text("👋 Gửi mã key "UExxxxx" để nhận file.")
 
 # === Xử lý key người dùng ===
 async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
