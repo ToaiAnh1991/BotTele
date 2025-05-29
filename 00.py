@@ -83,7 +83,7 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for file_info in files_info:
             try:
-                # 📤 Copy message từ kênh sang người dùng
+                # Gửi file
                 sent_message = await context.bot.copy_message(
                     chat_id=chat_id,
                     from_chat_id=CHANNEL_ID,
@@ -91,22 +91,27 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True
                 )
 
-                # 🧪 Kiểm tra nếu message chứa tài liệu (file)
+                # Kiểm tra kích thước file nếu là tài liệu
                 if sent_message.document:
                     file_id = sent_message.document.file_id
                     file = await context.bot.get_file(file_id)
 
                     if file.file_size < 100_000:  # dưới 100KB
-                        await update.message.reply_text("please contact admin ( https://t.me/A911Studio ) to receive new file update")
+                        await update.message.reply_text(
+                            "⚠️ File nhỏ hơn 100KB. Vui lòng liên hệ admin để nhận bản cập nhật mới.\n👉 https://t.me/A911Studio"
+                        )
 
+                # Thông báo file đã gửi
                 await update.message.reply_text(f"♥️ Your File \"{file_info['name_file']}\"")
 
             except Exception as e:
                 logger.error(f"[ERROR] Your File '{file_info['name_file']}': {e}")
-                errors += 1
+                errors += 1  # Chỉ tăng khi có ngoại lệ
 
         if errors:
-            await update.message.reply_text("⚠️ some files were corrupted when sent. please contact admin ( https://t.me/A911Studio ) to receive new file update")
+            await update.message.reply_text(
+                "⚠️ Một số file bị lỗi khi gửi. Vui lòng liên hệ admin để được hỗ trợ.\n👉 https://t.me/A911Studio"
+            )
     else:
         await update.message.reply_text("❌ KEY is incorrect. Please check again.")
 
