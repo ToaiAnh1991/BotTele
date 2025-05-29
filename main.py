@@ -101,14 +101,7 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     message_id=int(file_info["message_id"]),
                     protect_content=True
                 )
-
-                if sent_message.document:
-                    file = await context.bot.get_file(sent_message.document.file_id)
-                    if file.file_size < 100_000:
-                        await update.message.reply_text(
-                            "⚠️ File nhỏ hơn 100KB. Vui lòng liên hệ admin để nhận bản cập nhật mới.\n👉 https://t.me/A911Studio"
-                        )
-
+            
                 await update.message.reply_text(f"♥️ Your File \"{file_info['name_file']}\"")
             except Exception as e:
                 logger.error(f"File send error: {e}")
