@@ -83,7 +83,7 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for file_info in files_info:
             try:
-                # Gửi file
+                # 📤 Gửi tin nhắn từ kênh tới người dùng
                 sent_message = await context.bot.copy_message(
                     chat_id=chat_id,
                     from_chat_id=CHANNEL_ID,
@@ -91,24 +91,26 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     protect_content=True
                 )
 
-                # Kiểm tra kích thước file nếu là tài liệu
-                if sent_message.document:
-                    file_id = sent_message.document.file_id
-                    file = await context.bot.get_file(file_id)
-
-                    if file.file_size < 100_000:  # dưới 100KB
-                        await update.message.reply_text(
-                            "⚠️ File nhỏ hơn 100KB. Vui lòng liên hệ admin để nhận bản cập nhật mới.\n👉 https://t.me/A911Studio"
-                        )
-
-                # Thông báo file đã gửi
+                # ✅ Thông báo gửi thành công
                 await update.message.reply_text(f"♥️ Your File \"{file_info['name_file']}\"")
 
-            except Exception as e:
-                logger.error(f"[ERROR] Your File '{file_info['name_file']}': {e}")
-                errors += 1  # Chỉ tăng khi có ngoại lệ
+                # 📦 Kiểm tra kích thước file nếu là tài liệu
+                try:
+                    if sent_message.document:
+                        file = await context.bot.get_file(sent_message.document.file_id)
+                        if file.file_size < 100_000:  # dưới 100KB
+                            await update.message.reply_text(
+                                "⚠️ File nhỏ hơn 100KB. Vui lòng liên hệ admin để nhận bản cập nhật.\n👉 https://t.me/A911Studio"
+                            )
+                except Exception as file_check_error:
+                    logger.warning(f"⚠️ Không kiểm tra được kích thước file: {file_check_error}")
+                    # Không tăng errors, chỉ ghi log
 
-        if errors:
+            except Exception as e:
+                logger.error(f"[ERROR] Gửi file '{file_info['name_file']}': {e}")
+                errors += 1  # Chỉ tăng khi GỬI file thất bại
+
+        if errors > 0:
             await update.message.reply_text(
                 "⚠️ Một số file bị lỗi khi gửi. Vui lòng liên hệ admin để được hỗ trợ.\n👉 https://t.me/A911Studio"
             )
