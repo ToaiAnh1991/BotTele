@@ -83,7 +83,7 @@ async def telegram_webhook(token: str, request: Request):
 
 # Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("♥️ Please send your KEY to receive the file.")
+    await update.message.reply_text("♥️ Please send your KEY to receive the file.\n♥️ Admin: t.me/A911Studio")
 
 async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text.strip().lower()
@@ -109,7 +109,7 @@ async def handle_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if errors:
             await update.message.reply_text(
-                "⚠️ Một số file bị lỗi khi gửi. Vui lòng liên hệ admin để được hỗ trợ.\n👉 https://t.me/A911Studio"
+                "⚠️ File not found. Please contact admin for support.\n♥️ https://t.me/A911Studio"
             )
     else:
         await update.message.reply_text("❌ KEY is incorrect. Please check again.")
