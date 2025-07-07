@@ -41,6 +41,7 @@ def load_key_map_from_sheet():
             logger.error("❌ GOOGLE_SHEET_JSON environment variable is missing.")
             return {}
 
+        # Đọc JSON từ chuỗi biến môi trường trực tiếp, không ghi file tạm
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(json_key_str), scope)
         gc = gspread.authorize(credentials)
 
@@ -94,6 +95,14 @@ async def telegram_webhook(token: str, request: Request):
         return {"error": "Invalid token"}
     try:
         body = await request.json()
+        
+        # Xử lý Ping từ cron-job.org:
+        # Nếu body rỗng (do bạn đã cấu hình {} trong cron-job.org)
+        # hoặc nếu nó không chứa 'update_id' (một trường bắt buộc trong mỗi update Telegram)
+        if not body or 'update_id' not in body: 
+            logger.info("Received empty or non-Telegram JSON body. Likely a keep-alive ping.")
+            return {"ok": True} # Trả về OK để xác nhận đã nhận request ping
+
         update = Update.de_json(body, bot_app.bot)
         await bot_app.process_update(update)
     except Exception as e:
@@ -104,7 +113,7 @@ async def telegram_webhook(token: str, request: Request):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "♥️ Hi. Please send your key UExxxxx to the Ue3dFreeBOT to receive the file.\n♥️ Contact Admin if file error: t.me/A911Studio"
+        "♥️ Hi. Please send your key UExxxxx to the Ue3dFreeBOT to receive the file.\nContact Admin if file error: t.me/A911Studio"
     )
 
 async def reload_sheet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -125,27 +134,28 @@ async def enqueue_key_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     user_input = update.message.text.strip().lower()
 
-    # Bước 1: Kiểm tra nếu bot chưa sẵn sàng (KEY_MAP rỗng)
+    # Bước 1: Kiểm tra nếu người dùng đã có yêu cầu đang chờ/xử lý
+    if user_id in USER_ACTIVE_REQUESTS:
+        await update.message.reply_text("⏳ Sending previous file. Please wait for current file to be received before sending another KEY !")
+        logger.info(f"User {user_id} sent key '{user_input}' but already has an active request.")
+        return
+
+    # Bước 2: Kiểm tra nếu bot chưa sẵn sàng (KEY_MAP rỗng)
     if not KEY_MAP:
         # Thông báo mới cho trường hợp bot đang sleep/khởi động
-        await update.message.reply_text("⏰ Bot đang khởi động hoặc chưa sẵn sàng. Vui lòng đợi vài phút và gửi KEY của bạn một lần nữa.")
-        return
+        await update.message.reply_text("⏰ Bot is starting. Please wait a few minutes and send your KEY again.")
+        logger.info(f"User {user_id} sent key '{user_input}' while bot was starting. Request not queued.")
+        return # Kết thúc xử lý ở đây nếu bot đang khởi động
 
-    # Bước 2: Kiểm tra nếu KEY không hợp lệ ngay lập tức
+    # Bước 3: Kiểm tra nếu KEY không hợp lệ ngay lập tức
     if user_input not in KEY_MAP:
-        await update.message.reply_text("❌ KEY không chính xác. Vui lòng kiểm tra lại.")
-        return
-
-    # Bước 3: Kiểm tra nếu người dùng đã có yêu cầu đang chờ/xử lý
-    if user_id in USER_ACTIVE_REQUESTS:
-        # Thông báo mới cho trường hợp người dùng gửi liên tục khi có yêu cầu đang chờ
-        await update.message.reply_text("⏳ Yêu cầu trước đó của bạn đang được xử lý. Vui lòng đợi nhận file hiện tại trước khi gửi KEY khác.")
+        await update.message.reply_text("❌ KEY is incorrect. Please check again.")
         return
 
     # Nếu tất cả các kiểm tra đều vượt qua, thêm yêu cầu vào hàng đợi và đánh dấu người dùng
     await PROCESSING_QUEUE.put({"update": update, "context": context})
     USER_ACTIVE_REQUESTS[user_id] = True # Đánh dấu người dùng này đang có yêu cầu chờ
-    await update.message.reply_text("✅ Yêu cầu của bạn đã được nhận và đang chờ xử lý. Vui lòng đợi trong giây lát để nhận file.")
+    await update.message.reply_text("✅ Sending file. Please wait a moment !")
     logger.info(f"Request for user {user_id} with key '{user_input}' added to queue.")
 
 async def process_queue_task():
@@ -154,9 +164,18 @@ async def process_queue_task():
         update = request_data["update"]
         context = request_data["context"]
         user_id = update.effective_user.id
+        user_input = update.message.text.strip().lower() # Lấy user_input từ update
 
-        logger.info(f"Processing queued request for user {user_id}")
-        await handle_key_actual(update, context)
+        logger.info(f"Processing queued request for user {user_id} with key '{user_input}'")
+
+        # KIỂM TRA LẠI KEY_MAP TRƯỚC KHI XỬ LÝ TỪ HÀNG ĐỢI
+        if not KEY_MAP or user_input not in KEY_MAP:
+            await update.message.reply_text(
+                "⚠️ Sorry, Error processing file. Please try again later or contact admin.\n Admin: t.me/A911Studio"
+            )
+            logger.warning(f"Failed to process queued request for user {user_id}: KEY_MAP not ready or key '{user_input}' not found.")
+        else:
+            await handle_key_actual(update, context)
 
         # Sau khi xử lý xong, xóa người dùng khỏi danh sách active requests
         if user_id in USER_ACTIVE_REQUESTS:
@@ -185,15 +204,15 @@ async def handle_key_actual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=message_id,
                 protect_content=True
             )
-            await update.message.reply_text(f"♥️ Đây là File của bạn: \"{file_info['name_file']}\"")
+            await update.message.reply_text(f"Your File: \{file_info['name_file']}\")
         except Exception as e:
             logger.error(f"File send error (user: {update.effective_user.id}, key: {user_input}, file: {file_info.get('name_file', 'N/A')}): {e}")
             errors += 1
 
     if errors:
         await update.message.reply_text(
-            "⚠️ Có lỗi khi gửi một hoặc nhiều file. Vui lòng liên hệ Admin.\n♥️ Admin: t.me/A911Studio"
+            "⚠️ Files not found. Please contact admin.\n Admin: t.me/A911Studio"
         )
     else:
-        # Thông báo mới khi tất cả file đã được gửi thành công
-        await update.message.reply_text("✅ Đã gửi tất cả file thành công. Bạn có thể gửi KEY tiếp theo nếu muốn.")
+        # Thông báo khi tất cả file đã được gửi thành công
+        await update.message.reply_text("✅ File sent successfully. You can send next KEY.")
