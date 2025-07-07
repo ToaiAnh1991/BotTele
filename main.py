@@ -204,7 +204,7 @@ async def handle_key_actual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=message_id,
                 protect_content=True
             )
-            await update.message.reply_text(f"Your File: \{file_info['name_file']}\")
+            await update.message.reply_text(f"Your File: \"{file_info['name_file']}\"")
         except Exception as e:
             logger.error(f"File send error (user: {update.effective_user.id}, key: {user_input}, file: {file_info.get('name_file', 'N/A')}): {e}")
             errors += 1
